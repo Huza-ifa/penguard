@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PenGuard — AI Grammar & Spell Checker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink:       #0d0d0d;
+      --paper:     #f5f0e8;
+      --cream:     #ede8dc;
+      --rule:      #d4cdc0;
+      --accent:    #c0392b;
+      --accent2:   #1a6b4a;
+      --accent3:   #1e4d8c;
+      --muted:     #7a7468;
+      --highlight-spell: rgba(192,57,43,0.18);
+      --highlight-gram:  rgba(26,107,74,0.15);
+      --highlight-punct: rgba(30,77,140,0.15);
+      --highlight-style: rgba(180,140,20,0.15);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Instrument Sans', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 2.5rem;
+      border-bottom: 1.5px solid var(--rule);
+      background: var(--paper);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.5rem; letter-spacing: -0.02em;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .logo-dot { color: var(--accent); }
+    .badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem; font-weight: 500;
+      background: var(--ink); color: var(--paper);
+      padding: 0.2em 0.55em; border-radius: 2px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    nav a { font-size: 0.85rem; color: var(--muted); text-decoration: none; transition: color .2s; }
+    nav a:hover { color: var(--ink); }
+
+    /* Hero */
+    .hero {
+      padding: 3rem 2.5rem 1.5rem;
+      max-width: 900px; margin: 0 auto; width: 100%;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      line-height: 1.1; letter-spacing: -0.03em; max-width: 640px;
+    }
+    .hero h1 em { font-style: italic; color: var(--accent); }
+    .hero p { margin-top: 0.75rem; color: var(--muted); font-size: 0.95rem; max-width: 480px; line-height: 1.6; }
+
+    /* Main */
+    main {
+      flex: 1; max-width: 900px; margin: 0 auto; width: 100%;
+      padding: 0 2.5rem 4rem;
+      display: flex; flex-direction: column; gap: 1.5rem;
+    }
+
+    /* Editor */
+    .editor-wrap {
+      border: 1.5px solid var(--rule); border-radius: 4px;
+      background: #fff; transition: border-color .2s;
+    }
+    .editor-wrap:focus-within { border-color: var(--ink); }
+    .editor-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--rule); background: var(--cream);
+    }
+    .editor-label {
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+    .char-count { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+    #inputText {
+      width: 100%; min-height: 220px; padding: 1.25rem;
+      font-family: 'Instrument Sans', sans-serif; font-size: 1rem;
+      line-height: 1.75; color: var(--ink);
+      border: none; outline: none; resize: vertical; background: transparent;
+    }
+
+    /* Actions */
+    .actions { display: flex; gap: 0.75rem; align-items: center; }
+    .btn-check {
+      padding: 0.7rem 2rem; background: var(--ink); color: var(--paper);
+      border: none; border-radius: 3px;
+      font-family: 'Instrument Sans', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
+      transition: background .2s, transform .1s; letter-spacing: 0.01em;
+    }
+    .btn-check:hover { background: #222; }
+    .btn-check:active { transform: scale(0.98); }
+    .btn-check:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-clear {
+      padding: 0.7rem 1.2rem; background: transparent; color: var(--muted);
+      border: 1.5px solid var(--rule); border-radius: 3px;
+      font-family: 'Instrument Sans', sans-serif; font-size: 0.9rem;
+      cursor: pointer; transition: color .2s, border-color .2s;
+    }
+    .btn-clear:hover { color: var(--ink); border-color: var(--ink); }
+    .lang-select {
+      margin-left: auto; padding: 0.5rem 0.75rem;
+      border: 1.5px solid var(--rule); border-radius: 3px;
+      font-family: 'DM Mono', monospace; font-size: 0.75rem;
+      color: var(--muted); background: transparent; cursor: pointer; outline: none;
+    }
+    .spinner {
+      display: none; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Status bar */
+    .status-bar {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.8rem 1.1rem;
+      border: 1.5px solid var(--rule); border-radius: 4px;
+      background: var(--cream); font-size: 0.87rem; min-height: 48px;
+      transition: background .3s, border-color .3s;
+    }
+    .status-bar.has-errors { border-color: #e8b4b0; background: #fdf6f5; }
+    .status-bar.all-good   { border-color: #a3d9bc; background: #f0faf5; }
+    .status-bar.api-error  { border-color: #f0c040; background: #fffbea; }
+    .status-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .status-msg  { flex: 1; color: var(--ink); line-height: 1.4; }
+    .issue-pills { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-left: auto; }
+    .pill {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem; font-weight: 500;
+      padding: 0.2em 0.6em; border-radius: 2px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .pill-spell { background: #f5c6c2; color: #7b1a14; }
+    .pill-gram  { background: #b8e8d4; color: #0e3d27; }
+    .pill-punct { background: #bdd3f0; color: #0d2a5e; }
+    .pill-style { background: #f5e6a0; color: #5a4300; }
+
+    /* Results grid */
+    .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 680px) { .results-grid { grid-template-columns: 1fr; } }
+    .result-panel { border: 1.5px solid var(--rule); border-radius: 4px; background: #fff; overflow: hidden; }
+    .result-panel-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: var(--cream);
+      border-bottom: 1px solid var(--rule);
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+    .result-panel-body {
+      padding: 1rem 1.25rem; font-size: 0.93rem; line-height: 1.75;
+      min-height: 80px; color: var(--ink); word-break: break-word;
+    }
+
+    /* Marks */
+    mark.spell       { background: var(--highlight-spell); color: inherit; border-bottom: 2px solid var(--accent);  border-radius: 1px; padding: 0 1px; }
+    mark.grammar     { background: var(--highlight-gram);  color: inherit; border-bottom: 2px solid var(--accent2); border-radius: 1px; padding: 0 1px; }
+    mark.punctuation { background: var(--highlight-punct); color: inherit; border-bottom: 2px solid var(--accent3); border-radius: 1px; padding: 0 1px; }
+    mark.style       { background: var(--highlight-style); color: inherit; border-bottom: 2px dashed #b8960c;       border-radius: 1px; padding: 0 1px; }
+
+    /* Corrections list */
+    .corrections-section { border: 1.5px solid var(--rule); border-radius: 4px; background: #fff; overflow: hidden; }
+    .corrections-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.6rem 1rem; background: var(--cream);
+      border-bottom: 1px solid var(--rule);
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+    .correction-item {
+      display: grid; grid-template-columns: 2.5rem 1fr;
+      gap: 0.75rem; align-items: start;
+      padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--cream);
+      transition: background .15s;
+    }
+    .correction-item:last-child { border-bottom: none; }
+    .correction-item:hover { background: var(--cream); }
+    .ci-num { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); padding-top: 0.15rem; }
+    .ci-error {
+      font-size: 0.78rem; font-weight: 600; margin: 0.2rem 0;
+      font-family: 'DM Mono', monospace; color: var(--accent);
+      text-decoration: line-through; text-decoration-color: var(--accent);
+    }
+    .ci-msg { font-size: 0.83rem; color: var(--ink); line-height: 1.5; }
+    .ci-suggestions { margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .sug-btn {
+      font-family: 'DM Mono', monospace; font-size: 0.7rem;
+      padding: 0.22em 0.65em; background: var(--ink); color: var(--paper);
+      border: none; border-radius: 2px; cursor: pointer; transition: opacity .15s;
+    }
+    .sug-btn:hover { opacity: 0.72; }
+
+    /* Copy btn */
+    .copy-btn {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      padding: 0.25em 0.7em; background: transparent; color: var(--muted);
+      border: 1px solid var(--rule); border-radius: 2px; cursor: pointer;
+      transition: color .15s, border-color .15s;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .copy-btn:hover { color: var(--ink); border-color: var(--ink); }
+
+    .hidden { display: none !important; }
+
+    footer {
+      border-top: 1px solid var(--rule); text-align: center;
+      padding: 1rem; font-size: 0.75rem; color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+    footer a { color: inherit; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Pen<span class="logo-dot">.</span>Guard <span class="badge">AI</span></div>
+  <nav><a href="https://languagetool.org" target="_blank" rel="noopener">Powered by LanguageTool</a></nav>
+</header>
+
+<div class="hero">
+  <h1>Write with <em>precision.</em><br>Catch every mistake.</h1>
+  <p>Paste your text below. PenGuard checks spelling, grammar, and punctuation using AI-powered analysis.</p>
+</div>
+
+<main>
+
+  <div class="editor-wrap">
+    <div class="editor-toolbar">
+      <span class="editor-label">Your Text</span>
+      <span class="char-count" id="charCount">0 / 10,000</span>
+    </div>
+    <textarea id="inputText"
+      placeholder="Start typing or paste your text here…&#10;&#10;Example: She recieve the letter yesterday but dont replied to it."
+      maxlength="10000"></textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn-check" id="checkBtn">
+      <span class="spinner" id="spinner"></span>
+      <span id="btnLabel">Check Text</span>
+    </button>
+    <button class="btn-clear" id="clearBtn">Clear</button>
+    <select class="lang-select" id="langSelect">
+      <option value="en-US">en‑US</option>
+      <option value="en-GB">en‑GB</option>
+      <option value="en-AU">en‑AU</option>
+      <option value="en-CA">en‑CA</option>
+    </select>
+  </div>
+
+  <div class="status-bar" id="statusBar">
+    <span class="status-icon">✏️</span>
+    <span class="status-msg" id="statusMsg">Enter your text above and click <strong>Check Text</strong> to begin.</span>
+    <div class="issue-pills" id="issuePills"></div>
+  </div>
+
+  <div class="results-grid hidden" id="resultsGrid">
+    <div class="result-panel">
+      <div class="result-panel-head"><span>Original (highlighted)</span></div>
+      <div class="result-panel-body" id="originalHighlighted"></div>
+    </div>
+    <div class="result-panel">
+      <div class="result-panel-head">
+        <span>Corrected</span>
+        <button class="copy-btn" id="copyBtn">Copy</button>
+      </div>
+      <div class="result-panel-body" id="correctedText"></div>
+    </div>
+  </div>
+
+  <div class="corrections-section hidden" id="correctionsSection">
+    <div class="corrections-head">
+      <span>Issues Found</span>
+      <span id="correctionsCount" style="font-weight:400;color:var(--muted);"></span>
+    </div>
+    <div id="correctionsList"></div>
+  </div>
+
+</main>
+
+<footer>PenGuard · LanguageTool API · No data stored · <a href="https://languagetool.org/privacy/" target="_blank">Privacy</a></footer>
+
+<script>
+  // ──────────────────────────────────────────────────────────────
+  //  PenGuard — calls LanguageTool API DIRECTLY from the browser.
+  //
+  //  Behaviour:
+  //    ✅ Correct text    → green "No issues found" status
+  //    🔍 Errors found    → highlights + corrections list
+  //    ⚠️ Network failure → yellow warning (real connection error only)
+  // ──────────────────────────────────────────────────────────────
+  const API = 'https://api.languagetool.org/v2/check';
+
+  const inputText          = document.getElementById('inputText');
+  const checkBtn           = document.getElementById('checkBtn');
+  const clearBtn           = document.getElementById('clearBtn');
+  const spinner            = document.getElementById('spinner');
+  const btnLabel           = document.getElementById('btnLabel');
+  const charCount          = document.getElementById('charCount');
+  const statusBar          = document.getElementById('statusBar');
+  const statusMsg          = document.getElementById('statusMsg');
+  const issuePills         = document.getElementById('issuePills');
+  const resultsGrid        = document.getElementById('resultsGrid');
+  const correctionsSection = document.getElementById('correctionsSection');
+  const langSelect         = document.getElementById('langSelect');
+  const copyBtn            = document.getElementById('copyBtn');
+
+  let lastCorrectedText = '';
+
+  inputText.addEventListener('input', () => {
+    charCount.textContent = `${inputText.value.length.toLocaleString()} / 10,000`;
+  });
+
+  clearBtn.addEventListener('click', () => {
+    inputText.value = '';
+    charCount.textContent = '0 / 10,000';
+    lastCorrectedText = '';
+    hideResults();
+    setStatus('', '✏️', 'Enter your text above and click <strong>Check Text</strong> to begin.', []);
+  });
+
+  copyBtn.addEventListener('click', () => {
+    if (!lastCorrectedText) return;
+    navigator.clipboard.writeText(lastCorrectedText).then(() => {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1800);
+    });
+  });
+
+  checkBtn.addEventListener('click', runCheck);
+  inputText.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runCheck();
+  });
+
+  // ══════════════════════════════════════════════════════
+  async function runCheck() {
+    const text = inputText.value.trim();
+    if (!text) {
+      setStatus('api-error', '⚠️', 'Please enter some text before checking.', []);
+      return;
+    }
+
+    setLoading(true);
+    setStatus('', '⏳', 'Analyzing your text…', []);
+    hideResults();
+
+    try {
+      // POST to LanguageTool API directly (no C# proxy needed)
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          text:        text,
+          language:    langSelect.value,
+          enabledOnly: 'false'
+        })
+      });
+
+      if (!res.ok) throw new Error(`API responded with HTTP ${res.status}`);
+
+      const json      = await res.json();
+      const matches   = json.matches || [];
+      const fixes     = matches.map(m => ({
+        offset:       m.offset,
+        length:       m.length,
+        errorText:    text.substring(m.offset, m.offset + m.length),
+        message:      m.message       || '',
+        shortMessage: m.shortMessage  || '',
+        category:     mapCategory(m.rule?.category?.id || ''),
+        suggestions:  (m.replacements || []).slice(0, 5).map(r => r.value)
+      }));
+
+      renderResults(text, fixes);
+
+    } catch (err) {
+      // Only fires on a real network/API problem — never on "correct" text
+      console.error('[PenGuard]', err);
+      setStatus('api-error', '⚠️',
+        `Could not reach the grammar API. Please check your internet connection and try again.
+         <br><small style="color:var(--muted)">${escapeHtml(err.message)}</small>`, []);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════
+  function renderResults(originalText, fixes) {
+
+    // ── No issues ──
+    if (fixes.length === 0) {
+      setStatus('all-good', '✅',
+        'Your text looks great! No spelling, grammar, or punctuation issues found.', []);
+      hideResults();
+      return;
+    }
+
+    // ── Issues found ──
+    const corrected = applyCorrections(originalText, fixes);
+    lastCorrectedText = corrected;
+
+    // Category pills
+    const cats = {};
+    fixes.forEach(c => { const k = c.category.toLowerCase(); cats[k] = (cats[k]||0)+1; });
+    const pills = Object.entries(cats).map(([k, v]) => {
+      const cls = k.includes('spell') ? 'spell' : k.includes('punct') ? 'punct' : k.includes('style') ? 'style' : 'gram';
+      return `<span class="pill pill-${cls}">${k} ×${v}</span>`;
+    });
+
+    const n = fixes.length;
+    setStatus('has-errors', '🔍',
+      `Found <strong>${n} issue${n===1?'':'s'}</strong> in your text.`, pills);
+
+    document.getElementById('originalHighlighted').innerHTML = buildHighlighted(originalText, fixes);
+    document.getElementById('correctedText').textContent = corrected;
+    renderList(fixes);
+
+    resultsGrid.classList.remove('hidden');
+    correctionsSection.classList.remove('hidden');
+  }
+
+  // ══════════════════════════════════════════════════════
+  function buildHighlighted(text, fixes) {
+    const sorted = [...fixes].sort((a,b) => a.offset - b.offset);
+    let html = '', cursor = 0;
+    for (const c of sorted) {
+      if (c.offset < cursor) continue;
+      html += escapeHtml(text.substring(cursor, c.offset));
+      const cls = categoryClass(c.category);
+      const tip = escapeAttr(c.shortMessage || c.category);
+      html += `<mark class="${cls}" title="${tip}">${escapeHtml(text.substring(c.offset, c.offset+c.length))}</mark>`;
+      cursor = c.offset + c.length;
+    }
+    html += escapeHtml(text.substring(cursor));
+    return html;
+  }
+
+  function applyCorrections(text, fixes) {
+    const sorted = [...fixes].filter(c=>c.suggestions.length>0).sort((a,b)=>b.offset-a.offset);
+    let r = text;
+    for (const c of sorted) {
+      if (c.offset<0 || c.offset+c.length>r.length) continue;
+      r = r.substring(0, c.offset) + c.suggestions[0] + r.substring(c.offset+c.length);
+    }
+    return r;
+  }
+
+  function renderList(fixes) {
+    const list  = document.getElementById('correctionsList');
+    const count = document.getElementById('correctionsCount');
+    count.textContent = `${fixes.length} issue${fixes.length===1?'':'s'}`;
+
+    list.innerHTML = fixes.map((c,i) => {
+      const cls     = categoryClass(c.category);
+      const pillCls = cls==='grammar'?'gram': cls==='punctuation'?'punct': cls;
+      const sugs    = c.suggestions.slice(0,4).map(s =>
+        `<button class="sug-btn" data-offset="${c.offset}" data-len="${c.length}" data-val="${escapeAttr(s)}">${escapeHtml(s)}</button>`
+      ).join('');
+      return `
+        <div class="correction-item">
+          <span class="ci-num">#${i+1}</span>
+          <div>
+            <span class="pill pill-${pillCls}">${escapeHtml(c.category)}</span>
+            <div class="ci-error">${escapeHtml(c.errorText||'(empty)')}</div>
+            <div class="ci-msg">${escapeHtml(c.message)}</div>
+            ${sugs ? `<div class="ci-suggestions">${sugs}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('.sug-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val=btn.dataset.val, offset=+btn.dataset.offset, len=+btn.dataset.len;
+        const cur = inputText.value;
+        inputText.value = cur.substring(0,offset)+val+cur.substring(offset+len);
+        charCount.textContent = `${inputText.value.length.toLocaleString()} / 10,000`;
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════════
+  function mapCategory(id) {
+    const u = (id||'').toUpperCase();
+    if (u==='TYPOS'||u==='SPELLING')    return 'Spelling';
+    if (u==='PUNCTUATION')              return 'Punctuation';
+    if (u==='STYLE'||u==='REDUNDANCY')  return 'Style';
+    if (u==='CASING')                   return 'Casing';
+    return 'Grammar';
+  }
+  function categoryClass(cat) {
+    const c=(cat||'').toLowerCase();
+    if (c.includes('spell'))  return 'spell';
+    if (c.includes('punct'))  return 'punctuation';
+    if (c.includes('style')||c.includes('redund')) return 'style';
+    return 'grammar';
+  }
+  function setStatus(type, icon, msg, pills) {
+    statusBar.className = 'status-bar'+(type?` ${type}`:'');
+    statusBar.querySelector('.status-icon').textContent = icon;
+    statusMsg.innerHTML = msg;
+    issuePills.innerHTML = (pills||[]).join('');
+  }
+  function setLoading(on) {
+    checkBtn.disabled     = on;
+    spinner.style.display = on?'block':'none';
+    btnLabel.textContent  = on?'Checking…':'Check Text';
+  }
+  function hideResults() {
+    resultsGrid.classList.add('hidden');
+    correctionsSection.classList.add('hidden');
+  }
+  function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escapeAttr(s) { return (s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+</script>
+</body>
+</html>
